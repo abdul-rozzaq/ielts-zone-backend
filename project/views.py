@@ -8,10 +8,6 @@ from rest_framework.response import Response
 from rest_framework import status
 
 import qrcode
-from qrcode.image.styles.colormasks import SolidFillColorMask
-from qrcode.image.styles.moduledrawers.pil import CircleModuleDrawer
-from qrcode.image.styledpil import StyledPilImage
-
 
 from .models import Pupil, Token, Exam
 from .authentication import TokenAuthentication
