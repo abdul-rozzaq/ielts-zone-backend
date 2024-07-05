@@ -8,6 +8,10 @@ from rest_framework.response import Response
 from rest_framework import status
 
 import qrcode
+from qrcode.image.styles.colormasks import SolidFillColorMask
+from qrcode.image.styles.moduledrawers.pil import CircleModuleDrawer
+from qrcode.image.styledpil import StyledPilImage
+
 
 from .models import Pupil, Token, Exam
 from .authentication import TokenAuthentication
@@ -54,13 +58,14 @@ def exam_qr_code(request, exam_id):
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
+        box_size=25,
+        border=2,
     )
     qr.add_data(exam.code)
     qr.make(fit=True)
 
-    img = qr.make_image(fill_color="black", back_color="white")
+    img = qr.make_image()
+
     response = HttpResponse(content_type="image/png")
     img.save(response, "PNG")
     return response

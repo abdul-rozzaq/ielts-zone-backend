@@ -2,6 +2,7 @@ import random
 import string
 import uuid
 
+from django.utils import timezone
 from django.conf import settings
 from django.db import models
 
@@ -35,6 +36,7 @@ class Exam(models.Model):
     title = models.CharField(max_length=1024)
     duration = models.IntegerField()
     code = models.CharField(max_length=6, unique=True, editable=False)
+    created_at = models.DateTimeField(default=timezone.now)
 
     def save(self, *args, **kwargs):
         if not self.code:
@@ -64,3 +66,35 @@ class Answer(models.Model):
 
     def __str__(self):
         return self.text
+
+
+class AnswerSheet(models.Model):
+    pupil = models.ForeignKey(Pupil, related_name='answer_sheets', on_delete=models.CASCADE)
+    exam = models.ForeignKey(Exam, related_name='answer_sheets', on_delete=models.CASCADE)
+    created = models.DateTimeField(default=timezone.now)
+    
+    def __str__(self):
+        return f"{self.pupil.full_name} - {self.exam.title}"
+
+
+    @property
+    def computed_percentage(self):
+        tests_count = self.exam.tests.count()
+        correct_answers_count = len([x for x in self.answers.all() if x.is_correct])
+        return (correct_answers_count / tests_count) * 100 if tests_count > 0 else 0
+
+    @computed_percentage.setter
+    def computed_percentage(self, value):
+        self.save()
+    
+class PupilAnswer(models.Model):
+    answer_sheet = models.ForeignKey(AnswerSheet, related_name='answers', on_delete=models.CASCADE)
+    test = models.ForeignKey(Test, related_name='answer_sheets', on_delete=models.CASCADE)
+    answer = models.ForeignKey(Answer, related_name='answer_sheets', on_delete=models.CASCADE)
+    is_correct = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        
+        self.is_correct = self.answer.is_correct and self.test == self.answer.test
+        
+        return super().save(*args, **kwargs)
