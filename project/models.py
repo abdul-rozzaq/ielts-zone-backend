@@ -76,7 +76,6 @@ class AnswerSheet(models.Model):
     def __str__(self):
         return f"{self.pupil.full_name} - {self.exam.title}"
 
-
     @property
     def computed_percentage(self):
         tests_count = self.exam.tests.count()

@@ -11,8 +11,8 @@ import qrcode
 
 from .models import Pupil, Token, Exam
 from .authentication import TokenAuthentication
-from .serializers import PupilSerializer, ExamSerializer
-
+from .serializers import AnswerSheetSerializer, PupilSerializer, ExamSerializer
+from .permissions import IsAuthenticated
 
 
 class RegisterView(APIView):
@@ -32,20 +32,20 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
-    authentication_classes = [TokenAuthentication]
-
+    
     def post(self, request):
-        username = request.data.get('id')
+        id = request.data.get('id')
         password = request.data.get('password')
         
-        if not username or not password:
+        if not id or not password:
             return Response({'error': 'Id and password required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        token = self.authentication_classes[0]().authenticate(request, username=username, password=password)
-        
-        if token:
-            
-            return Response({**PupilSerializer(token.pupil).data, 'token': str(token.key)}, status=status.HTTP_200_OK)
+        queryset = Pupil.objects.filter(id=id, password=password)
+
+        pupil = queryset.first() if queryset.exists() else None
+
+        if pupil:
+            return Response({**PupilSerializer(pupil).data, 'token': str(pupil.auth_token.key)}, status=status.HTTP_200_OK)
 
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -74,3 +74,18 @@ class ExamViewSet(viewsets.ViewSet):
         exam = get_object_or_404(Exam, code=code)
         serializer = ExamSerializer(exam)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class AnswerSheetAPIView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        data = request.data
+        serializers = AnswerSheetSerializer(data={**{key: value for key, value in data.items()}, 'pupil': request.user.pk})
+        
+        if serializers.is_valid():
+            serializers.save()
+            return Response(serializers.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializers.errors)

@@ -1,21 +1,50 @@
-from django.contrib.auth.backends import BaseBackend
-from django.contrib.auth.hashers import check_password
-from .models import Pupil, Token
+from rest_framework import HTTP_HEADER_ENCODING
+from rest_framework.authentication import BaseAuthentication, exceptions
+from .models import Token
 
-class TokenAuthentication(BaseBackend):
 
-    def authenticate(self, request, username=None, password=None):
-        try:
-            pupil = Pupil.objects.get(id=username)
-            if pupil.password == password:
-                token, created = Token.objects.get_or_create(pupil=pupil)
-                return token
-        except Pupil.DoesNotExist:
+def get_authorization_header(request):
+    auth = request.META.get('HTTP_AUTHORIZATION', b'')
+    if isinstance(auth, str):
+        auth = auth.encode(HTTP_HEADER_ENCODING)
+    return auth
+
+
+class TokenAuthentication(BaseAuthentication):
+    keyword = 'Token'
+    model = None
+
+    def authenticate(self, request):
+        auth = get_authorization_header(request).split()
+
+        if not auth or auth[0].lower() != self.keyword.lower().encode():
             return None
 
-    def get_user(self, token_key):
+        if len(auth) == 1:
+            msg = 'Invalid token header. No credentials provided.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        elif len(auth) > 2:
+            msg = 'Invalid token header. Token string should not contain spaces.'
+            raise exceptions.AuthenticationFailed(msg)
+
         try:
-            token = Token.objects.get(key=token_key)
-            return token.pupil
+            token = auth[1].decode()
+
+        except UnicodeError:
+            msg = 'Invalid token header. Token string should not contain invalid characters.'
+            raise exceptions.AuthenticationFailed(msg)
+
+        return self.authenticate_credentials(token)
+
+    def authenticate_credentials(self, key):
+        try:
+            token = Token.objects.select_related('pupil').get(key=key)
+
         except Token.DoesNotExist:
-            return None
+            raise exceptions.AuthenticationFailed('Invalid token.')
+
+        return (token.pupil, token)
+
+    def authenticate_header(self, request):
+        return self.keyword
